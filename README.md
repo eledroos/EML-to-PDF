@@ -31,6 +31,26 @@ Usage
 
 ---
 
+macOS Gatekeeper Bypass Instructions
+-----
+
+This app is not signed with an Apple Developer ID. When you open the app for the first time, macOS will show a security warning. Follow these steps to run the app:
+
+1. Download and unzip the app:
+    - Click the download link for the .zip file.
+    - Double-click the .zip file to extract the app.
+
+2. Right-click to Open:
+    - Right-click (or Control-click) the app and select Open.
+    - A warning will appear saying, "The app cannot be opened because it is from an unidentified developer."
+
+3. Confirm and Open:
+    - In the warning dialog, click Open to confirm.
+    - The app will now run.
+
+4. Run Normally in the Future:
+    - After the first successful run, you can open the app by double-clicking it as usual.
+
 License
 -------
 This project is released under the **CC0 Public Domain Dedication**. See the `LICENSE` file for details.
