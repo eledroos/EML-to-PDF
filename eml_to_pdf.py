@@ -129,23 +129,24 @@ def convert_eml_to_pdf():
         doc.build(elements)
 
     # Show a pretty final message
-    final_message = (
-        f"✅ <b>Conversion Complete!</b>\n"
-        f"Converted <b>{len(processed_files)}</b> EML files to PDF in:\n"
-        f"'{output_folder}'.\n\n"
-    )
     if skipped_files:
-        final_message += (
-            f"⚠️ <b>{len(skipped_files)} files were skipped.</b>\n"
+        final_message = (
+            "✅ Conversion Complete! 🎉\n\n"
+            f"Converted: {len(processed_files)} EML files to PDF.\n"
+            f"Location: {output_folder}\n\n"
+            f"⚠️ Skipped: {len(skipped_files)} files.\n"
             f"A detailed list has been saved in 'Skipped_Files_Report.pdf' in the same folder."
         )
     else:
-        final_message += "🎉 No files were skipped!"
+        final_message = (
+            "✅ Conversion Complete!\n\n"
+            f"Converted: {len(processed_files)} EML files to PDF.\n"
+            f"Location: {output_folder}\n\n"
+            "🎉 No files were skipped!"
+        )
 
-    messagebox.showinfo(
-        "Conversion Complete",
-        final_message,
-    )
+    messagebox.showinfo("Conversion Complete", final_message)
+
 
 # Create GUI
 app = tk.Tk()
