@@ -6,7 +6,26 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus.flowables import Image
+import tempfile
+import base64
+import re
 import os
+import html
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Check for xhtml2pdf but don't use it - it doesn't handle CID image references correctly
+try:
+    from xhtml2pdf import pisa
+    XHTML2PDF_AVAILABLE = False  # Disable for now even if available, as it's causing issues
+    logger.info("xhtml2pdf found but disabled for compatibility with email CID references")
+except ImportError:
+    XHTML2PDF_AVAILABLE = False
+    logger.info("xhtml2pdf not found, using simplified HTML processing")
 
 
 def display_help():
@@ -42,6 +61,176 @@ def format_filename(date, subject, existing_names):
         counter += 1
 
     return unique_name
+
+
+def extract_text_from_html(html_content):
+    """
+    Extract readable text from HTML content by cleaning up HTML tags.
+    Handles complex HTML with CID images better than direct conversion.
+    
+    Args:
+        html_content: The raw HTML content from email
+        
+    Returns:
+        Cleaned, readable text content
+    """
+    try:
+        # Remove scripts
+        content = re.sub(r'<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>', '', html_content, flags=re.DOTALL)
+        
+        # Remove styles
+        content = re.sub(r'<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>', '', content, flags=re.DOTALL)
+        
+        # Replace image tags with placeholders to avoid parsing issues
+        content = re.sub(r'<img[^>]*?src="cid:[^"]*"[^>]*?alt="([^"]*)"[^>]*?>', r'[Image: \1]', content)
+        content = re.sub(r'<img[^>]*?alt="([^"]*)"[^>]*?>', r'[Image: \1]', content)
+        content = re.sub(r'<img[^>]*?>', r'[Image]', content)
+        
+        # Replace links with text and URL
+        content = re.sub(r'<a[^>]*?href="([^"]*)"[^>]*?>(.*?)<\/a>', r'\2 (\1)', content, flags=re.DOTALL)
+        
+        # Replace common block elements with line breaks
+        for tag in ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'li', 'br']:
+            if tag == 'br':
+                pattern = f'<{tag}[^>]*?>'
+                content = re.sub(pattern, '\n', content)
+            else:
+                pattern = f'</{tag}[^>]*?>'
+                content = re.sub(pattern, '\n', content)
+        
+        # Handle lists with bullets
+        content = re.sub(r'<li[^>]*?>', r'• ', content)
+        
+        # Replace table cells with spacing
+        content = re.sub(r'<td[^>]*?>', r' | ', content)
+        
+        # Emphasize bold and headers
+        for tag in ['b', 'strong', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            pattern_start = f'<{tag}[^>]*?>'
+            pattern_end = f'</{tag}>'
+            content = re.sub(pattern_start, '*', content)
+            content = re.sub(pattern_end, '*', content)
+        
+        # Emphasize italic
+        for tag in ['i', 'em']:
+            pattern_start = f'<{tag}[^>]*?>'
+            pattern_end = f'</{tag}>'
+            content = re.sub(pattern_start, '_', content)
+            content = re.sub(pattern_end, '_', content)
+        
+        # Remove all remaining HTML tags
+        content = re.sub(r'<[^>]*?>', '', content)
+        
+        # Decode HTML entities
+        content = html.unescape(content)
+        
+        # Fix multiple line breaks
+        content = re.sub(r'\n\s*\n', '\n\n', content)
+        
+        # Trim extra whitespace
+        content = re.sub(r'[ \t]+', ' ', content)
+        
+        return content.strip()
+        
+    except Exception as e:
+        logger.error(f"Error extracting text from HTML: {e}")
+        # Return minimal cleaned content on error
+        return re.sub(r'<[^>]*?>', ' ', html_content)
+
+
+def convert_html_to_pdf(html_content, output_path, metadata):
+    """
+    Create a PDF from email HTML content.
+    Uses a reliable text extraction approach that works with any email format.
+    
+    Args:
+        html_content: The HTML content to convert
+        output_path: The output PDF path
+        metadata: Dictionary containing email metadata
+    
+    Returns:
+        True if successful, False if failed
+    """
+    try:
+        # Extract readable text from HTML
+        extracted_text = extract_text_from_html(html_content)
+        
+        # Create PDF with ReportLab
+        doc = SimpleDocTemplate(output_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        
+        # Create a Title style with more space
+        title_style = styles["Title"]
+        
+        # Add metadata in a structured format
+        elements = []
+        
+        # Add email subject as title
+        subject = metadata.get('subject', 'No Subject')
+        elements.append(Paragraph(subject, title_style))
+        elements.append(Spacer(1, 20))
+        
+        # Add metadata table
+        metadata_text = f"""
+        <b>From:</b> {metadata.get('sender', 'Unknown Sender')}<br/>
+        <b>To:</b> {metadata.get('recipients', 'No Recipients')}<br/>
+        <b>CC:</b> {metadata.get('cc', 'No CC')}<br/>
+        <b>BCC:</b> {metadata.get('bcc', 'No BCC')}<br/>
+        <b>Date:</b> {metadata.get('date', 'Unknown Date')}<br/>
+        """
+        elements.append(Paragraph(metadata_text, styles["Normal"]))
+        elements.append(Spacer(1, 20))
+        
+        # Add a divider
+        elements.append(Paragraph("<hr/>", styles["Normal"]))
+        elements.append(Spacer(1, 10))
+        
+        # Add note about HTML content
+        elements.append(Paragraph("<i>Note: This email contained HTML content. Formatting has been simplified for compatibility.</i>", styles["Normal"]))
+        elements.append(Spacer(1, 20))
+        
+        # Process the extracted text, replacing newlines with <br/>
+        formatted_text = extracted_text.replace('\n', '<br/>')
+        
+        # Wrap this in a try-except in case there's any ReportLab parsing issues
+        try:
+            elements.append(Paragraph(formatted_text, styles["Normal"]))
+        except Exception as parser_error:
+            logger.error(f"Error parsing HTML with ReportLab: {parser_error}")
+            # Fallback to extreme sanitization if even the extracted text has issues
+            safe_text = html.escape(extracted_text).replace('\n', '<br/>')
+            elements.append(Paragraph(f"<i>Note: Additional formatting issues were detected.</i><br/><br/>{safe_text}", styles["Normal"]))
+        
+        doc.build(elements)
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error converting HTML to PDF: {e}")
+        
+        # Last resort fallback - create a minimal PDF with just metadata and error notice
+        try:
+            doc = SimpleDocTemplate(output_path, pagesize=letter)
+            styles = getSampleStyleSheet()
+            
+            elements = []
+            subject = metadata.get('subject', 'No Subject')
+            elements.append(Paragraph(subject, styles["Title"]))
+            elements.append(Spacer(1, 20))
+            
+            # Add metadata
+            for key, value in metadata.items():
+                if value and value.lower() not in ['no cc', 'no bcc', 'no recipients', 'unknown sender', 'unknown date']:
+                    elements.append(Paragraph(f"<b>{key.capitalize()}:</b> {value}", styles["Normal"]))
+            
+            elements.append(Spacer(1, 20))
+            elements.append(Paragraph("<b>Note:</b> This email contained complex HTML content that could not be fully converted. "
+                               "The content may be better viewed in an email client.", styles["Normal"]))
+            
+            doc.build(elements)
+            return True
+        except Exception as fallback_error:
+            logger.error(f"Critical error in fallback PDF creation: {fallback_error}")
+            return False
 
 
 def create_progress_popup():
@@ -109,38 +298,66 @@ def convert_eml_to_pdf():
             output_folder = os.path.join(base_output_folder, year, month)
             os.makedirs(output_folder, exist_ok=True)
 
-            # Extract body content safely
-            if not msg.get_body(preferencelist=('plain')):  # Check if body exists
-                skipped_files.append(eml_file)  # Add to skipped files
+            # Extract body content safely - try plain text first, then HTML if plain not available
+            body_part = msg.get_body(preferencelist=('plain', 'html'))
+            if not body_part:  # Check if any body exists
+                skipped_reason = f"{eml_file}: No plain text or HTML body found"
+                skipped_files.append(skipped_reason)
                 continue
-
-            body = msg.get_body(preferencelist=('plain')).get_content()
 
             # Format the filename
             new_filename = format_filename(date, subject, processed_files)
             processed_files.add(new_filename)
 
-            # Create PDF
+            # Create PDF path
             pdf_path = os.path.join(output_folder, f"{new_filename}.pdf")
-            doc = SimpleDocTemplate(pdf_path, pagesize=letter)
-            styles = getSampleStyleSheet()
+            
+            # Create metadata dictionary
+            metadata = {
+                'subject': subject,
+                'sender': sender,
+                'recipients': recipients,
+                'cc': cc,
+                'bcc': bcc,
+                'date': date
+            }
+            
+            # Handle different content types
+            if body_part.get_content_type() == 'text/html':
+                html_content = body_part.get_content()
+                
+                # Process HTML content with our specialized function
+                success = convert_html_to_pdf(html_content, pdf_path, metadata)
+                
+                if not success:
+                    skipped_reason = f"{eml_file}: Failed to convert HTML content to PDF"
+                    skipped_files.append(skipped_reason)
+                    continue
+            else:
+                # Text content - use regular ReportLab approach
+                body = body_part.get_content()
+                doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+                styles = getSampleStyleSheet()
 
-            # Build PDF content
-            elements = []
-            elements.append(Paragraph(f"<b>Subject:</b> {subject}", styles["Normal"]))
-            elements.append(Paragraph(f"<b>From:</b> {sender}", styles["Normal"]))
-            elements.append(Paragraph(f"<b>To:</b> {recipients}", styles["Normal"]))
-            elements.append(Paragraph(f"<b>CC:</b> {cc}", styles["Normal"]))
-            elements.append(Paragraph(f"<b>BCC:</b> {bcc}", styles["Normal"]))
-            elements.append(Paragraph(f"<b>Date:</b> {date}", styles["Normal"]))
-            elements.append(Spacer(1, 20))
-            formatted_body = body.replace("\n", "<br />")
-            elements.append(Paragraph(f"<b>Body:</b><br />{formatted_body}", styles["Normal"]))
-
-            doc.build(elements)
+                # Build PDF content
+                elements = []
+                elements.append(Paragraph(f"<b>Subject:</b> {subject}", styles["Normal"]))
+                elements.append(Paragraph(f"<b>From:</b> {sender}", styles["Normal"]))
+                elements.append(Paragraph(f"<b>To:</b> {recipients}", styles["Normal"]))
+                elements.append(Paragraph(f"<b>CC:</b> {cc}", styles["Normal"]))
+                elements.append(Paragraph(f"<b>BCC:</b> {bcc}", styles["Normal"]))
+                elements.append(Paragraph(f"<b>Date:</b> {date}", styles["Normal"]))
+                elements.append(Spacer(1, 20))
+                # Safely escape and format plain text
+                import html
+                safe_body = html.escape(body).replace("\n", "<br />")
+                elements.append(Paragraph(f"<b>Body:</b><br />{safe_body}", styles["Normal"]))
+                doc.build(elements)
 
         except Exception as e:
-            skipped_files.append(eml_file)  # Add problematic file to skipped list
+            # Add problematic file to skipped list with error reason
+            skipped_reason = f"{eml_file}: {str(e)}"
+            skipped_files.append(skipped_reason)
             continue
 
         # Update progress bar
@@ -157,8 +374,14 @@ def convert_eml_to_pdf():
         styles = getSampleStyleSheet()
         elements = [Paragraph("<b>Skipped Files Report</b>", styles["Title"])]
         elements.append(Spacer(1, 20))
-        for file in skipped_files:
-            elements.append(Paragraph(file, styles["Normal"]))
+        elements.append(Paragraph("<b>The following files were skipped during processing with reasons:</b>", styles["Normal"]))
+        elements.append(Spacer(1, 10))
+        for entry in skipped_files:
+            # Escape any HTML/XML special characters in the error message
+            import html
+            safe_entry = html.escape(entry)
+            elements.append(Paragraph(safe_entry, styles["Normal"]))
+            elements.append(Spacer(1, 5))
         doc.build(elements)
 
     # Show a pretty final message

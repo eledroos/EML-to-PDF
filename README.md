@@ -19,7 +19,9 @@ Features
 Requirements
 ------------
 - Python 3.7+
-- Install dependencies using: `pip install reportlab`
+- Required dependency: `pip install reportlab`
+
+The tool handles both plain text and HTML emails, converting them to formatted PDFs. HTML content is converted to readable text with formatting cues where possible.
 
 ---
 
