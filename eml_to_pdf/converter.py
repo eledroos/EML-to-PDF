@@ -20,6 +20,7 @@ from .html_renderer import (
     WEASYPRINT_AVAILABLE
 )
 from .attachment_handler import extract_attachments, AttachmentInfo
+from .contact_extractor import extract_contacts_from_eml, generate_address_book, Contact
 
 
 @dataclass
@@ -41,6 +42,7 @@ class BatchConversionResult:
     results: List[ConversionResult]
     output_folder: str
     cancelled: bool = False
+    address_book_path: Optional[str] = None
 
 
 def extract_metadata(msg: EmailMessage) -> Dict[str, str]:
@@ -293,6 +295,7 @@ def convert_batch(
 
     results = []
     processed_files: Set[str] = set()
+    all_contacts: List[Contact] = []
     successful = 0
     failed = 0
     cancelled = False
@@ -311,12 +314,27 @@ def convert_batch(
 
         if result.success:
             successful += 1
-        else:
+
+        # Extract contacts if address book generation is enabled
+        if config.generate_address_book:
+            contacts = extract_contacts_from_eml(eml_path)
+            all_contacts.extend(contacts)
+
+        if not result.success:
             failed += 1
 
     # Final progress callback
     if progress_callback and not cancelled:
         progress_callback(len(eml_files), len(eml_files), "Complete")
+
+    # Generate address book if enabled and we have contacts
+    address_book_path = None
+    if config.generate_address_book and all_contacts and not cancelled:
+        from pathlib import Path
+        csv_path = Path(output_folder) / "address_book.csv"
+        result_path = generate_address_book(all_contacts, csv_path, dedupe=True)
+        if result_path:
+            address_book_path = str(result_path)
 
     return BatchConversionResult(
         total_files=len(eml_files),
@@ -324,7 +342,8 @@ def convert_batch(
         failed=failed,
         results=results,
         output_folder=output_folder,
-        cancelled=cancelled
+        cancelled=cancelled,
+        address_book_path=address_book_path
     )
 
 

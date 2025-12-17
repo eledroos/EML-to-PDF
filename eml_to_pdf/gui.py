@@ -242,6 +242,10 @@ class SettingsWindow:
         ttk.Checkbutton(main, text="Use WeasyPrint for HTML emails",
                         variable=self.weasy_var).pack(anchor="w", pady=2)
 
+        self.addressbook_var = self._bv(self.config.generate_address_book)
+        ttk.Checkbutton(main, text="Generate address book (CSV)",
+                        variable=self.addressbook_var).pack(anchor="w", pady=2)
+
         # Metadata
         self._section_label(main, "Include in PDF", pady=(20, 5))
 
@@ -308,6 +312,7 @@ class SettingsWindow:
         self.config.organize_by_date = self.organize_var.get()
         self.config.extract_attachments = self.attach_var.get()
         self.config.use_weasyprint = self.weasy_var.get()
+        self.config.generate_address_book = self.addressbook_var.get()
         self.config.include_subject = self.meta_vars['subject'].get()
         self.config.include_from = self.meta_vars['from'].get()
         self.config.include_to = self.meta_vars['to'].get()
@@ -471,16 +476,20 @@ class EMLConverterApp:
 
         self.attach_var = self._bv(self.config.extract_attachments)
         self.organize_var = self._bv(self.config.organize_by_date)
+        self.addressbook_var = self._bv(self.config.generate_address_book)
 
         ttk.Checkbutton(options_row, text="Extract attachments",
                         variable=self.attach_var, command=self._update_config).pack(side="left")
         ttk.Checkbutton(options_row, text="Organize by date",
                         variable=self.organize_var, command=self._update_config).pack(side="left", padx=(20, 0))
+        ttk.Checkbutton(options_row, text="Generate address book",
+                        variable=self.addressbook_var, command=self._update_config).pack(side="left", padx=(20, 0))
 
     def _update_config(self):
         """Update config from quick settings."""
         self.config.extract_attachments = self.attach_var.get()
         self.config.organize_by_date = self.organize_var.get()
+        self.config.generate_address_book = self.addressbook_var.get()
         self.config.save()
 
     def _create_recent_folders(self):
@@ -594,11 +603,14 @@ class EMLConverterApp:
 
         self.attach_var = self._bv(self.config.extract_attachments)
         self.organize_var = self._bv(self.config.organize_by_date)
+        self.addressbook_var = self._bv(self.config.generate_address_book)
 
         ttk.Checkbutton(settings_frame, text="Extract attachments",
                         variable=self.attach_var, command=self._update_config).pack(side="left")
         ttk.Checkbutton(settings_frame, text="Organize by date",
                         variable=self.organize_var, command=self._update_config).pack(side="left", padx=(20, 0))
+        ttk.Checkbutton(settings_frame, text="Generate address book",
+                        variable=self.addressbook_var, command=self._update_config).pack(side="left", padx=(20, 0))
 
         # Action buttons
         btn_frame = ttk.Frame(self.content_frame)
@@ -717,6 +729,9 @@ class EMLConverterApp:
         else:
             message = f"Successfully converted {result.successful} emails to PDF.\n\n"
             message += f"Output: {result.output_folder}\n"
+
+            if result.address_book_path:
+                message += f"\nAddress book: address_book.csv"
 
             if result.failed > 0:
                 message += f"\n{result.failed} files skipped (see Skipped_Files_Report.pdf)"

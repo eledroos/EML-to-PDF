@@ -34,6 +34,7 @@ class ConversionConfig:
     extract_attachments: bool = False
     attachment_folder: str = "attachments"
     use_weasyprint: bool = True  # Use WeasyPrint for HTML rendering
+    generate_address_book: bool = False  # Generate CSV address book
 
     # UI settings
     theme: str = "cosmo"  # ttkbootstrap theme name

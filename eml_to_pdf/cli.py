@@ -65,6 +65,12 @@ Examples:
     )
 
     parser.add_argument(
+        '-a', '--address-book',
+        action='store_true',
+        help='Generate CSV address book with unique contacts from all emails'
+    )
+
+    parser.add_argument(
         '-v', '--verbose',
         action='store_true',
         help='Enable verbose output'
@@ -140,6 +146,7 @@ def run_cli(args: argparse.Namespace) -> int:
         organize_by_date=not args.no_organize,
         extract_attachments=args.extract_attachments,
         use_weasyprint=not args.no_weasyprint,
+        generate_address_book=args.address_book,
     )
 
     # Determine output folder
@@ -150,6 +157,8 @@ def run_cli(args: argparse.Namespace) -> int:
         print(f"Output folder: {output_folder}")
         if args.extract_attachments:
             print("Attachment extraction: enabled")
+        if args.address_book:
+            print("Address book generation: enabled")
         print()
 
     # Track progress
@@ -205,6 +214,9 @@ def run_cli(args: argparse.Namespace) -> int:
         print(f"Failed:         {result.failed}")
         print(f"Time elapsed:   {elapsed:.1f}s")
         print(f"Output folder:  {result.output_folder}")
+
+        if result.address_book_path:
+            print(f"Address book:   address_book.csv")
 
         if result.failed > 0:
             print(f"\nSee Skipped_Files_Report.pdf for details on failed conversions.")
