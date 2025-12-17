@@ -58,11 +58,8 @@ jobs:
             echo "version=2.0.0" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build application
-        run: python build.py --platform ${{ matrix.platform }}
-
-      - name: Package release
-        run: python build.py --platform ${{ matrix.platform }} --package
+      - name: Build and package
+        run: python build.py --package
 
       - name: List dist contents
         shell: bash
