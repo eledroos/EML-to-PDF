@@ -1,0 +1,13 @@
+# EML to PDF Converter - Development/Build Dependencies
+
+# Include runtime dependencies
+-r requirements.txt
+
+# Build tools
+pyinstaller>=6.0.0
+pillow>=10.0.0
+
+# Code quality (optional)
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0

@@ -1,0 +1,73 @@
+[project]
+name = "eml-to-pdf"
+version = "2.0.0"
+description = "Convert EML email files to PDF format with HTML rendering and attachment support"
+readme = "README.md"
+license = {text = "CC0-1.0"}
+authors = [
+    {name = "Nasser Eledroos"}
+]
+requires-python = ">=3.8"
+keywords = ["email", "eml", "pdf", "converter", "outlook", "thunderbird"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: MacOS X",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications :: GTK",
+    "Intended Audience :: End Users/Desktop",
+    "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Email",
+    "Topic :: Office/Business",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "reportlab>=4.0.0",
+]
+
+[project.optional-dependencies]
+full = [
+    "weasyprint>=59.0",
+    "ttkbootstrap>=1.10.0",
+    "tkinterdnd2>=0.3.0",
+]
+dev = [
+    "pyinstaller>=6.0.0",
+    "pillow>=10.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+eml-to-pdf = "eml_to_pdf:main"
+
+[project.urls]
+Homepage = "https://github.com/nassereledroos/EML-to-PDF"
+Repository = "https://github.com/nassereledroos/EML-to-PDF"
+Issues = "https://github.com/nassereledroos/EML-to-PDF/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["eml_to_pdf*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

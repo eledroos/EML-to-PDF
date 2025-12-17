@@ -158,6 +158,22 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
-*.icns
-*.png
+# macOS
 .DS_Store
+
+# Application config (user-specific)
+.eml_to_pdf_config.json
+
+# Generated icons (keep source in assets/)
+assets/icon.iconset/
+assets/icon_1024.png
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.claude/
+
+# Recent folders cache
+.eml_to_pdf_recent.json

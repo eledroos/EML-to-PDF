@@ -1,0 +1,13 @@
+# EML to PDF Converter - Runtime Dependencies
+
+# Core PDF generation
+reportlab>=4.0.0
+
+# HTML rendering (optional but recommended)
+weasyprint>=59.0
+
+# Modern UI theme (optional)
+ttkbootstrap>=1.10.0
+
+# Drag-and-drop support (optional)
+tkinterdnd2>=0.3.0
